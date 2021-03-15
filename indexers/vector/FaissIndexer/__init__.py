@@ -1,4 +1,4 @@
-__copyright__ = "Copyright (c) 2020 Jina AI Limited. All rights reserved."
+__copyright__ = "Copyright (c) 2021 Jina AI Limited. All rights reserved."
 __license__ = "Apache-2.0"
 
 from typing import Tuple, Optional
@@ -74,11 +74,15 @@ class FaissIndexer(FaissDevice, BaseNumpyIndexer):
         self.nprobe = nprobe
 
     def build_advanced_index(self, vecs: 'np.ndarray'):
-        """Load all vectors (in numpy ndarray) into Faiss indexers """
+        """Build an advanced index structure from a numpy array.
+
+        :param vecs: numpy array containing the vectors to index
+        """
         import faiss
 
         metric = faiss.METRIC_L2
         if self.distance == 'inner_product':
+            self.logger.warning('inner_product will be output as distance instead of similarity.')
             metric = faiss.METRIC_INNER_PRODUCT
         if self.distance not in {'inner_product', 'l2'}:
             self.logger.warning('Invalid distance metric for Faiss index construction. Defaulting to l2 distance')
@@ -106,12 +110,12 @@ class FaissIndexer(FaissDevice, BaseNumpyIndexer):
                     faiss.normalize_L2(train_data)
                 self._train(index, train_data)
 
-        self.build_partial_index(vecs, index)
+        self._build_partial_index(vecs, index)
         index.nprobe = self.nprobe
         return index
 
     @batching
-    def build_partial_index(self, vecs: 'np.ndarray', index):
+    def _build_partial_index(self, vecs: 'np.ndarray', index):
         vecs = vecs.astype(np.float32)
         if self.normalize:
             from faiss import normalize_L2
@@ -119,11 +123,17 @@ class FaissIndexer(FaissDevice, BaseNumpyIndexer):
         index.add(vecs)
 
     def query(self, vecs: 'np.ndarray', top_k: int, *args, **kwargs) -> Tuple['np.ndarray', 'np.ndarray']:
+        """Find the top-k vectors with smallest ``metric`` and return their ids in ascending order.
+        :param keys: numpy array containing vectors to search for
+        :param top_k: upper limit of responses for each search vector
+        """
         if self.normalize:
             from faiss import normalize_L2
             normalize_L2(vecs)
         dist, ids = self.query_handler.search(vecs, top_k)
-        keys = self.int2ext_id[self.valid_indices][ids]
+        if self.distance == 'inner_product':
+            dist = 1 - dist
+        keys = self._int2ext_id[self.valid_indices][ids]
         return keys, dist
 
     def _train(self, index, data: 'np.ndarray', *args, **kwargs) -> None:

@@ -2,15 +2,21 @@ from collections import deque
 from itertools import islice
 from typing import Dict, List
 
+from jina.executors.decorators import single
 from jina.executors.segmenters import BaseSegmenter
 
 
 class SlidingWindowSegmenter(BaseSegmenter):
     """
-    :class:`SlidingWindowSegmenter` split the text on the doc-level into overlapping substrings on the chunk-level.
-        The text is split into substrings of length ``window_size`` if possible.
-        The degree of overlapping can be configured through the ``step_size`` parameter.
-        The substrings that are shorter than the ``min_substring_len`` will be discarded.
+    :class:`SlidingWindowSegmenter` split the text on the doc-level
+    into overlapping substrings on the chunk-level.
+    The text is split into substrings of length ``window_size`` if possible.
+    The degree of overlapping can be configured through the ``step_size`` parameter.
+    The substrings that are shorter than the ``min_substring_len`` will be discarded.
+
+    :param window_size: the window size that will be used to split the text into substrings
+    :param step_size: the size of the degree of overlapping
+    :param min_substring_len: the minimum size of substrings. Anything shorter will be discarded
     """
 
     def __init__(self,
@@ -18,6 +24,7 @@ class SlidingWindowSegmenter(BaseSegmenter):
                  step_size: int = 150,
                  min_substring_len: int = 1,
                  *args, **kwargs):
+        """Set constructor."""
         super().__init__(*args, **kwargs)
         self.window_size = window_size
         self.step_size = step_size
@@ -34,6 +41,7 @@ class SlidingWindowSegmenter(BaseSegmenter):
                 'the step_size (={}) should not be larger than the window_size (={})'.format(
                     self.window_size, self.step_size))
 
+    @single
     def segment(self, text: str, *args, **kwargs) -> List[Dict]:
         """
         Split the text into overlapping chunks
@@ -41,7 +49,7 @@ class SlidingWindowSegmenter(BaseSegmenter):
         :return: a list of chunk dicts
         """
 
-        def sliding_window(iterable, size, step):
+        def sliding_window(size, step):
             i = iter(text)
             d = deque(islice(i, size),
                       maxlen=size)
@@ -58,7 +66,7 @@ class SlidingWindowSegmenter(BaseSegmenter):
                          for _ in range(step - 1))
 
         chunks = [''.join(filter(None, list(chunk))) for chunk in
-                  sliding_window(text, self.window_size, self.step_size)]
+                  sliding_window(self.window_size, self.step_size)]
         results = []
         for idx, s in enumerate(chunks):
             if self.min_substring_len <= len(s):

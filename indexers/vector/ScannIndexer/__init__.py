@@ -1,4 +1,4 @@
-__copyright__ = "Copyright (c) 2020 Jina AI Limited. All rights reserved."
+__copyright__ = "Copyright (c) 2021 Jina AI Limited. All rights reserved."
 __license__ = "Apache-2.0"
 
 from typing import Tuple
@@ -83,9 +83,13 @@ class ScannIndexer(BaseNumpyIndexer):
         return index
 
     def query(self, keys: 'np.ndarray', top_k: int, *args, **kwargs) -> Tuple['np.ndarray', 'np.ndarray']:
+        """Find the top-k vectors with smallest ``metric`` and return their ids in ascending order.
+        :param keys: numpy array containing vectors to search for
+        :param top_k: upper limit of responses for each search vector
+        """
         if self.reordering_num_neighbors < top_k:
             self.logger.warning('The number of reordering_num_neighbors should be the same or higher than top_k')
 
         neighbors, dist = self.query_handler.search_batched(keys, top_k)
-        return self.int2ext_id[np.array(neighbors)], np.array(dist)
+        return self._int2ext_id[np.array(neighbors)], np.array(dist)
 

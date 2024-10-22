@@ -9,7 +9,7 @@ import numpy as np
 
 from jina.executors.devices import TorchDevice
 from jina.excepts import PretrainedModelFileDoesNotExist
-from jina.executors.decorators import batching_multi_input, as_ndarray
+from jina.executors.decorators import batching, as_ndarray
 from jina.executors.encoders.multimodal import BaseMultiModalEncoder
 
 
@@ -45,12 +45,12 @@ class TirgMultiModalEncoder(TorchDevice, BaseMultiModalEncoder):
         else:
             raise PretrainedModelFileDoesNotExist(f'model {self.model_path} does not exist')
 
-    def _get_features(self, data):
+    def _get_features(self, content):
         import torch
-        visual_data = data[(self.positional_modality.index('image'))]
+        visual_data = content[(self.positional_modality.index('image'))]
         if self.channel_axis != self._default_channel_axis:
             visual_data = np.moveaxis(visual_data, self.channel_axis, self._default_channel_axis)
-        textual_data = data[(self.positional_modality.index('text'))]
+        textual_data = content[(self.positional_modality.index('text'))]
 
         visual_data = torch.from_numpy(np.stack(visual_data)).float()
         textual_data = np.stack(textual_data).tolist()
@@ -64,10 +64,10 @@ class TirgMultiModalEncoder(TorchDevice, BaseMultiModalEncoder):
 
         return self.model.compose_img_text_features(img_features, text_features)
 
-    @batching_multi_input(num_data=2)
+    @batching(slice_nargs=2)
     @as_ndarray
-    def encode(self, *data: 'np.ndarray', **kwargs) -> 'np.ndarray':
-        feature = self._get_features(data).detach()
+    def encode(self, *content: 'np.ndarray', **kwargs) -> 'np.ndarray':
+        feature = self._get_features(content).detach()
         if self.on_gpu:
             feature = feature.cpu()
         feature = feature.numpy()

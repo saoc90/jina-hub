@@ -11,22 +11,21 @@ from .. import RedisDBIndexer
 cur_dir = Path(__file__).parent.absolute()
 
 
-def create_document(doc_id, text, weight, length):
+def create_document(doc_id, text, weight):
     d = Document()
     d.id = str(doc_id)
     d.buffer = text.encode('utf8')
     d.weight = weight
-    d.length = length
     return d
 
 
 def get_documents(ids):
     documents = [
-        ['0', 'cat', 0.1, 3],
-        ['1', 'dog', 0.2, 3],
-        ['2', 'crow', 0.3, 4],
-        ['3', 'pikachu', 0.4, 7],
-        ['4', 'magikarp', 0.5, 8]
+        ['0', 'cat', 0.1],
+        ['1', 'dog', 0.2],
+        ['2', 'crow', 0.3],
+        ['3', 'pikachu', 0.4],
+        ['4', 'magikarp', 0.5]
     ]
     id_to_document = {d[0]: d for d in documents}
     data = [
@@ -68,21 +67,20 @@ def apply_actions(save_abspath, index_abspath, actions):
 
 def validate_positive_results(keys, documents, searcher: RedisDBIndexer):
     print('validate_positive_results')
-    for key, query_doc in zip(keys, documents):
-        result = searcher.query(key)
+    results = searcher.query(keys)
+    for key, query_doc, result in zip(keys, documents, results):
         result_doc = Document()
         result_doc.proto.ParseFromString(result)
         assert result_doc.id == str(query_doc[0])
         assert result_doc.buffer == query_doc[1].encode('utf8')
         assert round(result_doc.weight, 5) == query_doc[2]
-        assert result_doc.length == query_doc[3]
 
 
 def validate_negative_results(keys, searcher):
-    for key in keys:
-        result_docs = searcher.query(key)
-        assert result_docs is None
+    results_docs = searcher.query(keys)
 
+    for key, result in zip(keys, results_docs):
+        assert result == None
 
 def validate_results(save_abspath, results, negative_results):
     with BaseIndexer.load(save_abspath) as searcher:
